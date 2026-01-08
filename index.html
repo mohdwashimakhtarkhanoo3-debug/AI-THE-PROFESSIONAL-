@@ -2,71 +2,123 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Shoaib AI - Real</title>
+<title>Shoaib Ninja</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <style>
-body{margin:0;font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);height:100vh;display:flex;justify-content:center;align-items:center;color:white;}
-.app{width:350px;max-width:95%;background:#111;border-radius:20px;box-shadow:0 0 30px rgba(0,255,255,0.3);overflow:hidden;}
-.header{padding:15px;text-align:center;background:linear-gradient(90deg,#00f2ff,#00c6ff);color:black;font-size:22px;font-weight:bold;}
-.chat{height:350px;padding:10px;overflow-y:auto;}
-.msg{margin:8px 0;padding:10px;border-radius:15px;max-width:80%;animation:pop 0.3s ease;white-space: pre-wrap;}
-.user{background:#00c6ff;color:black;margin-left:auto;}
-.ai{background:#222;border:1px solid #00f2ff;}
-.input-box{display:flex;border-top:1px solid #333;}
-input{flex:1;padding:12px;border:none;outline:none;font-size:16px;}
-button{padding:12px 18px;border:none;background:#00c6ff;font-weight:bold;cursor:pointer;}
-@keyframes pop{from{transform:scale(0.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+body { margin:0; background:#0f172a; overflow:hidden; font-family:Arial,sans-serif; }
+#game { display:block; margin:auto; background:#1e293b; touch-action:none; }
+.controls { position:fixed; bottom:10px; width:100%; display:flex; justify-content:center; gap:10px; }
+button { padding:15px 20px; font-size:18px; border-radius:10px; border:none; background:#38bdf8; color:black; }
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="header">🤖 Shoaib AI</div>
-  <div class="chat" id="chat">
-    <div class="msg ai">Hello 👋 Main Shoaib AI hoon. Tum jo bhi poochoge main answer dunga 😎</div>
-  </div>
-  <div class="input-box">
-    <input id="input" placeholder="Ask something..." />
-    <button onclick="send()">Send</button>
-  </div>
+
+<canvas id="game" width="360" height="600"></canvas>
+
+<div class="controls">
+  <button ontouchstart="moveLeft=true" ontouchend="moveLeft=false">⬅</button>
+  <button ontouchstart="jump()">⬆</button>
+  <button ontouchstart="moveRight=true" ontouchend="moveRight=false">➡</button>
 </div>
 
 <script>
-const API_URL = "YOUR_CLOUDFLARE_WORKER_URL"; // Step 1 worker URL
+// Canvas setup
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
 
-function addMsg(text,type,replace=false){
-  const chat = document.getElementById("chat");
-  if(replace){
-    chat.lastChild.innerText = text;
-    chat.scrollTop = chat.scrollHeight;
-    return;
-  }
-  const div = document.createElement("div");
-  div.className="msg "+type;
-  div.innerText = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
+// Player setup
+let player = {
+  x:50, y:500, w:32, h:32,
+  vx:0, vy:0, speed:3, jump:-10,
+  grounded:false, frame:0
+};
 
-async function send(){
-  const input = document.getElementById("input");
-  const text = input.value.trim();
-  if(!text) return;
-  addMsg(text,"user");
-  input.value="";
-  addMsg("Typing... 🤖","ai",true);
+let gravity = 0.5;
+let moveLeft=false, moveRight=false;
 
-  try{
-    const res = await fetch(API_URL,{
-      method:"POST",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({message:text})
-    });
-    const data = await res.json();
-    addMsg(data.reply,"ai",true);
-  }catch(e){
-    addMsg("Oops! AI temporarily unavailable 😢","ai",true);
+// Platforms
+let platforms = [
+  {x:0, y:570, w:360, h:30},
+  {x:80, y:480, w:80, h:10},
+  {x:200, y:380, w:80, h:10},
+  {x:50, y:300, w:80, h:10}
+];
+
+function jump(){
+  if(player.grounded){
+    player.vy = player.jump;
+    player.grounded = false;
   }
 }
+
+// Keyboard controls
+document.addEventListener("keydown", e=>{
+  if(e.key==="ArrowLeft") moveLeft=true;
+  if(e.key==="ArrowRight") moveRight=true;
+  if(e.key==="ArrowUp") jump();
+});
+document.addEventListener("keyup", e=>{
+  if(e.key==="ArrowLeft") moveLeft=false;
+  if(e.key==="ArrowRight") moveRight=false;
+});
+
+// Update
+function update(){
+  if(moveLeft) player.vx=-player.speed;
+  else if(moveRight) player.vx=player.speed;
+  else player.vx=0;
+
+  player.vy += gravity;
+  player.x += player.vx;
+  player.y += player.vy;
+
+  // Platform collision
+  player.grounded=false;
+  platforms.forEach(p=>{
+    if(player.x < p.x+p.w &&
+       player.x+player.w>p.x &&
+       player.y+player.h<p.y+10 &&
+       player.y+player.h+player.vy>=p.y){
+         player.y=p.y-player.h;
+         player.vy=0;
+         player.grounded=true;
+    }
+  });
+
+  // Simple animation effect
+  if(moveLeft || moveRight){
+    player.frame++;
+    if(player.frame>10) player.frame=0;
+  } else {
+    player.frame=0;
+  }
+
+  // Reset if fall
+  if(player.y>canvas.height){
+    player.x=50;
+    player.y=500;
+    player.vy=0;
+  }
+}
+
+// Draw
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Draw player (rectangle with simple animation effect)
+  if(player.frame<5) ctx.fillStyle="#facc15"; // yellow
+  else ctx.fillStyle="#fcd34d"; // lighter yellow
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+
+  // Draw platforms
+  ctx.fillStyle="#22c55e";
+  platforms.forEach(p=>{ ctx.fillRect(p.x,p.y,p.w,p.h); });
+}
+
+// Game loop
+function loop(){ update(); draw(); requestAnimationFrame(loop); }
+loop();
 </script>
+
 </body>
 </html>
